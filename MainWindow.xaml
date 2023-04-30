@@ -8,11 +8,26 @@
         Title="MainWindow" Height="450" Width="800"
         Background="Black"
         WindowStartupLocation="CenterScreen"
-        Loaded="Window_Loaded">
+        PreviewKeyDown="Window_StartKeyDown"
+        KeyDown="Window_KeyDown">
     <Grid x:Name="MainGrid">
         <UniformGrid x:Name="playerGrid"
-                     Background="LightBlue" Margin="25,50,450,50"/>
+                     Background="#5F2580" Margin="25,50,450,50"/>
         <UniformGrid x:Name="enemyGrid"
-            Background="LightBlue" Margin="450,50,25,50"/>
+            Background="#300571	" Margin="450,50,25,50"/>
+        <Border x:Name="Overlay"
+                Background="Gray" Margin="104,72,104,71"
+                RenderOptions.EdgeMode="Aliased">
+            <TextBlock x:Name="OverlayText"
+                       Text="PRESS ANY KEY TO START"
+                       FontSize="24"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       />
+        </Border>
+        <StackPanel>
+            <TextBlock x:Name ="Text" Margin="356,69,356,340" Background="White"/>
+        </StackPanel>
     </Grid>
+
 </Window>

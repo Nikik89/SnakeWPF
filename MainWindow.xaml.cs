@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -29,14 +30,19 @@ namespace SnakeWPF
         };
 
         private readonly int rows = 10, cols = 10;
-        private readonly Image[,] gridImages;
-        private readonly GameLogic gameLogic;
+        private readonly Image[,] PgridImages;
+        private readonly Image[,] EgridImages;
+        private GameLogic PgameLogic;
+        private EnemyGameLogic EgameLogic;
         public MainWindow()
         {
             
             InitializeComponent();
-            CreateGrid(playerGrid);
-            CreateGrid(enemyGrid);
+            PgridImages = CreateGrid(playerGrid);
+            EgridImages = CreateGrid(enemyGrid);
+            PgameLogic = new GameLogic(rows, cols);
+            EgameLogic = new EnemyGameLogic(rows, cols);
+            
         }
 
 
@@ -61,37 +67,118 @@ namespace SnakeWPF
 
         }
 
-        private void Window_Loaded(object sender, RoutedEventArgs e)
+        private async Task RunGame()
         {
-            GameLoop();
+            Draw(PgridImages);
+            Draw(EgridImages);
+            Overlay.Visibility = Visibility.Hidden;
+            await GameLoop();
+            await ShowGameOver();
+            PgameLogic = new GameLogic(rows, cols);
+            EgameLogic = new EnemyGameLogic(rows, cols);
         }
-
-        private void GameLoop()
+        private async void Window_StartKeyDown(object sender, KeyEventArgs e)
         {
-            Draw();
-            while (true)
+            if (Overlay.Visibility == Visibility.Visible)
             {
-                gameLogic.Move();
-                Draw();
-                Console.WriteLine("moving");
+                e.Handled = true;
+            }
+            if (!gameRunning)
+            {
+                gameRunning = true;
+                await RunGame();
+                gameRunning = false;
             }
         }
-
-        private void Draw()
+        bool gameRunning = false;
+        private async Task ShowGameOver()
         {
-            DrawGrid();
+            await Task.Delay(500);
+            Overlay.Visibility = Visibility.Visible;
         }
-        private void DrawGrid()
+        private void Draw(Image[,] gridImg)
         {
-            for(int r = 0; r<rows; r++)
+            DrawGrid(gridImg);
+
+        }
+
+        private void DrawGrid(Image[,] gridImg)
+        {
+            if(gridImg == PgridImages)
             {
-                for(int c = 0; c <cols; c++)
+                for (int r = 0; r < rows; r++)
                 {
-                    GridValue gridVal = gameLogic.Grid[r, c];
-                    gridImages[r, c].Source = gridValToImage[gridVal];
+                    for (int c = 0; c < cols; c++)
+                    {
+                        GridValue gridVal = PgameLogic.Grid[r, c];
+                        gridImg[r, c].Source = gridValToImage[gridVal];
+                    }
+                }
+            }
+            else
+            {
+                for (int r = 0; r < rows; r++)
+                {
+                    for (int c = 0; c < cols; c++)
+                    {
+                        GridValue gridVal = EgameLogic.Grid[r, c];
+                        switch (gridVal)
+                        {
+                            case GridValue.Snake:
+                                EgameLogic.map[r, c] = 1;
+                                break;
+                            case GridValue.Empty:
+                                EgameLogic.map[r, c] = 0;
+                                break;
+                            case GridValue.Food:
+                                EgameLogic.map[r, c] = 2;
+                                break;
+                        }
+                        gridImg[r, c].Source = gridValToImage[gridVal];
+                    }
                 }
             }
         }
 
+        private void Window_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (PgameLogic.GameOver)
+            {
+                return;
+            }
+            switch (e.Key)
+            {
+                case Key.Left:
+                    PgameLogic.ChangeDirection(Direction.Left);
+                    break;
+                case Key.Right:
+                    PgameLogic.ChangeDirection(Direction.Right);
+                    break;
+                case Key.Up:
+                    PgameLogic.ChangeDirection(Direction.Up);
+                    break;
+                case Key.Down:
+                    PgameLogic.ChangeDirection(Direction.Down);
+                    break;
+            }
+            
+        }
+
+        private async Task GameLoop()
+        {
+            Draw(PgridImages);
+            Draw(EgridImages);
+            while (!PgameLogic.GameOver || !EgameLogic.GameOver)
+            {
+                await Task.Delay(25);
+                //PgameLogic.Move();
+                Draw(PgridImages);
+                EgameLogic.Move();
+                Draw(EgridImages);
+                Text.Text = EgameLogic.text;
+
+            }
+
+        }
     }
 }
