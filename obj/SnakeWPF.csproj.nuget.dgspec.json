@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\sdasf\\Desktop\\2курс\\2семак\\Прогр\\WPFSnake\\SnakeWPFtryAI\\SnakeWPF.csproj": {}
+    "C:\\Users\\sdasf\\Documents\\GitHub\\SnakeWPFwithAI\\SnakeWPF.csproj": {}
   },
   "projects": {
-    "C:\\Users\\sdasf\\Desktop\\2курс\\2семак\\Прогр\\WPFSnake\\SnakeWPFtryAI\\SnakeWPF.csproj": {
+    "C:\\Users\\sdasf\\Documents\\GitHub\\SnakeWPFwithAI\\SnakeWPF.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\sdasf\\Desktop\\2курс\\2семак\\Прогр\\WPFSnake\\SnakeWPFtryAI\\SnakeWPF.csproj",
+        "projectUniqueName": "C:\\Users\\sdasf\\Documents\\GitHub\\SnakeWPFwithAI\\SnakeWPF.csproj",
         "projectName": "SnakeWPF",
-        "projectPath": "C:\\Users\\sdasf\\Desktop\\2курс\\2семак\\Прогр\\WPFSnake\\SnakeWPFtryAI\\SnakeWPF.csproj",
+        "projectPath": "C:\\Users\\sdasf\\Documents\\GitHub\\SnakeWPFwithAI\\SnakeWPF.csproj",
         "packagesPath": "C:\\Users\\sdasf\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\sdasf\\Desktop\\2курс\\2семак\\Прогр\\WPFSnake\\SnakeWPFtryAI\\obj\\",
+        "outputPath": "C:\\Users\\sdasf\\Documents\\GitHub\\SnakeWPFwithAI\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -43,6 +43,12 @@
       "frameworks": {
         "net6.0-windows7.0": {
           "targetAlias": "net6.0-windows",
+          "dependencies": {
+            "Lucene.Net": {
+              "target": "Package",
+              "version": "[3.0.3, )"
+            }
+          },
           "imports": [
             "net461",
             "net462",

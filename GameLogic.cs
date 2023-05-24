@@ -7,14 +7,35 @@ using static System.Formats.Asn1.AsnWriter;
 
 namespace SnakeWPF
 {
-    internal class GameLogic
+    public class Direction
     {
+
+        public readonly static Direction Left = new Direction(0, -1);
+        public readonly static Direction Right = new Direction(0, 1);
+        public readonly static Direction Up = new Direction(-1, 0);
+        public readonly static Direction Down = new Direction(1, 0);
+
+        public int RowOffset { get; }
+        public int ColOffset { get; }
+        private Direction(int rowOffset, int colOffset)
+        {
+            RowOffset = rowOffset; 
+            ColOffset = colOffset;
+        }
+        public Direction Opposite()
+        {
+            return new Direction(-RowOffset, -ColOffset);
+        }
+    }
+    public class GameLogic
+    {
+        
         public int Rows { get; }
         public int Cols { get; }
         public Direction Dir { get; private set; }
         public GridValue[,] Grid { get; }
         private readonly LinkedList<Position> snakePositions = new LinkedList<Position>();
-
+        public int FoodCount { get; set; }
         public bool GameOver { get; private set; }
         private readonly Random random = new Random();
         public GameLogic(int rows, int cols)
@@ -23,6 +44,7 @@ namespace SnakeWPF
             Cols = cols;
             Grid = new GridValue[rows, cols];
             Dir = Direction.Right;
+            FoodCount = 0;
             AddSnake();
             AddFood();
         }
@@ -64,11 +86,15 @@ namespace SnakeWPF
 
         public void Move()
         {
-            
+            if (dirChanges.Count > 0)
+            {
+                Dir = dirChanges.First.Value;
+                dirChanges.RemoveFirst();
+            }
             Position newHeadPos = HeadPosition().Translate(Dir);
 
             GridValue hit = WillHit(newHeadPos);
-            if(hit == GridValue.Outside || hit == GridValue.Snake)
+            if (hit == GridValue.Outside || hit == GridValue.Snake)
             {
                 GameOver = true;
             }
@@ -79,6 +105,7 @@ namespace SnakeWPF
             }
             else if (hit == GridValue.Food)
             {
+                FoodCount++;
                 AddHead(newHeadPos);
                 AddFood();
             }
@@ -95,12 +122,40 @@ namespace SnakeWPF
             {
                 return GridValue.Outside;
             }
+            if (newHeadPos == TailPos())
+            {
+                return GridValue.Empty;
+            }
             return Grid[newHeadPos.Row, newHeadPos.Col];
         }
 
+        private Direction GetLastDirection()
+        {
+            if (dirChanges.Count == 0)
+            {
+                return Dir;
+            }
+            return dirChanges.Last.Value;
+        }
+
+        private bool CanChangeDirection(Direction newDir)
+        {
+            if (dirChanges.Count == 2)
+            {
+                return false;
+            }
+
+            Direction lastDir = GetLastDirection();
+            return newDir != lastDir && newDir != lastDir.Opposite();
+        }
+
+        private readonly LinkedList<Direction> dirChanges = new LinkedList<Direction>();
         public void ChangeDirection(Direction dir)
         {
-            Dir = dir;
+            if (CanChangeDirection(dir))
+            {
+                dirChanges.AddLast(dir);
+            }
         }
 
 
@@ -118,6 +173,10 @@ namespace SnakeWPF
         public Position HeadPosition()
         {
             return snakePositions.First.Value;
+        }
+        public Position TailPos()
+        {
+            return snakePositions.Last.Value;
         }
     }
 }

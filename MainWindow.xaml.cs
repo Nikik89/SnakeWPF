@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -29,11 +30,23 @@ namespace SnakeWPF
             {GridValue.Food, Images.Food  },
         };
 
-        private readonly int rows = 10, cols = 10;
+        private readonly Dictionary<Direction, int> dirToRot = new()
+        {
+            { Direction.Up, 0},
+            { Direction.Right, 90},
+            { Direction.Down, 180 },
+            { Direction.Left, 270}
+        };
+
+
+        private readonly int rows = 14, cols = 14;
         private readonly Image[,] PgridImages;
         private readonly Image[,] EgridImages;
         private GameLogic PgameLogic;
         private EnemyGameLogic EgameLogic;
+
+        private StreamWriter logfile;
+
         public MainWindow()
         {
             
@@ -42,7 +55,7 @@ namespace SnakeWPF
             EgridImages = CreateGrid(enemyGrid);
             PgameLogic = new GameLogic(rows, cols);
             EgameLogic = new EnemyGameLogic(rows, cols);
-            
+            logfile = new StreamWriter("log.txt");
         }
 
 
@@ -51,13 +64,15 @@ namespace SnakeWPF
             Image[,] images = new Image[rows, cols];
             gridName.Rows = rows;
             gridName.Columns = cols;
+            
             for(int r = 0; r < rows; r++)
             {
                 for(int c = 0; c < cols; c++)
                 {
                     Image image = new()
                     {
-                        Source = Images.Empty
+                        Source = Images.Empty,
+                        RenderTransformOrigin = new Point(0.5, 0.5)
                     };
                     images[r, c] = image;
                     gridName.Children.Add(image);
@@ -99,12 +114,13 @@ namespace SnakeWPF
         private void Draw(Image[,] gridImg)
         {
             DrawGrid(gridImg);
-
+            DrawSnakeHead(gridImg);
         }
-
+        public long astralstep = 0;  
         private void DrawGrid(Image[,] gridImg)
         {
-            if(gridImg == PgridImages)
+            astralstep++;
+            if (gridImg == PgridImages)
             {
                 for (int r = 0; r < rows; r++)
                 {
@@ -112,31 +128,45 @@ namespace SnakeWPF
                     {
                         GridValue gridVal = PgameLogic.Grid[r, c];
                         gridImg[r, c].Source = gridValToImage[gridVal];
+                        gridImg[r, c].RenderTransform = Transform.Identity;
                     }
                 }
             }
             else
             {
+                
                 for (int r = 0; r < rows; r++)
                 {
                     for (int c = 0; c < cols; c++)
                     {
                         GridValue gridVal = EgameLogic.Grid[r, c];
-                        switch (gridVal)
-                        {
-                            case GridValue.Snake:
-                                EgameLogic.map[r, c] = 1;
-                                break;
-                            case GridValue.Empty:
-                                EgameLogic.map[r, c] = 0;
-                                break;
-                            case GridValue.Food:
-                                EgameLogic.map[r, c] = 2;
-                                break;
-                        }
+                        logfile.Write(gridVal.ToString());
                         gridImg[r, c].Source = gridValToImage[gridVal];
+                        gridImg[r, c].RenderTransform = Transform.Identity;
                     }
+                    logfile.WriteLine();
                 }
+                logfile.WriteLine(Convert.ToString(astralstep));
+            }
+        }
+
+        private void DrawSnakeHead(Image[,] gridImg)
+        {
+            if (gridImg == PgridImages)
+            {
+                Position headPos = PgameLogic.HeadPosition();
+                Image image = PgridImages[headPos.Row, headPos.Col];
+                image.Source = Images.Head;
+
+                int rotation = dirToRot[PgameLogic.Dir];
+                image.RenderTransform = new RotateTransform(rotation);
+            }
+            else
+            {
+                var headPos = EgameLogic.Snake.Last();
+                Image image = EgridImages[headPos.X, headPos.Y];
+                image.Source = Images.AngryHead;
+                image.RenderTransform = new RotateTransform(EgameLogic.rotation);
             }
         }
 
@@ -161,24 +191,70 @@ namespace SnakeWPF
                     PgameLogic.ChangeDirection(Direction.Down);
                     break;
             }
-            
         }
 
         private async Task GameLoop()
         {
             Draw(PgridImages);
             Draw(EgridImages);
-            while (!PgameLogic.GameOver || !EgameLogic.GameOver)
+            while (StopGame())
             {
-                await Task.Delay(25);
-                //PgameLogic.Move();
+                await Task.Delay(150);
+                PgameLogic.Move();
                 Draw(PgridImages);
                 EgameLogic.Move();
-                Draw(EgridImages);
-                Text.Text = EgameLogic.text;
-
+                if (!EgameLogic.GameOver)
+                {
+                    Draw(EgridImages);
+                }
+                PlayerScore.Text = "SCORE " + Convert.ToString(PgameLogic.FoodCount);
+                EnemyScore.Text ="SCORE " + Convert.ToString(EgameLogic.FoodCount);
             }
+            EnemyWins.Text = "Wins: " + Convert.ToString(EnemyWinCount);
+            PlayerWins.Text = "Wins: " + Convert.ToString(PlayerWinCount);
+        }
 
+        public int EnemyWinCount = 0;
+        public int PlayerWinCount = 0;
+
+        private bool StopGame()
+        {
+            
+            if (PgameLogic.GameOver && !EgameLogic.GameOver)
+            {
+                if(EgameLogic.FoodCount > PgameLogic.FoodCount)
+                {
+                    MessageBox.Show("Компютер победил");
+                    EnemyWinCount++;
+                    return false;
+                }
+                else
+                {
+                    return true;
+                }
+            }
+            else if (EgameLogic.GameOver && !PgameLogic.GameOver)
+            {
+                if(PgameLogic.FoodCount > EgameLogic.FoodCount)
+                {
+                    MessageBox.Show("Человек крут");
+                    PlayerWinCount++;
+                    return false;
+                }
+                else
+                {
+                    return true;
+                }
+            }
+            else if (EgameLogic.GameOver && PgameLogic.GameOver)
+            {
+                return false;
+            }
+            else
+            {
+                return true;
+            }
+            
         }
     }
 }

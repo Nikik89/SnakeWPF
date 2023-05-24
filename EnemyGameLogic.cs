@@ -1,66 +1,45 @@
-﻿using System;
+﻿using Lucene.Net.Messages;
+using Lucene.Net.Support;
+using System;
 using System.Collections.Generic;
-using System.IO;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Drawing;
 using System.Linq;
 using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Media;
-using System.Diagnostics;
-using System.Windows.Shapes;
-using static System.Formats.Asn1.AsnWriter;
-using System.Windows.Media.Media3D;
-using System.Diagnostics.CodeAnalysis;
-using System.Windows.Input;
-using System.Reflection;
-using System.Windows;
-using System.Xml.Linq;
-using System.Drawing;
+using System.Windows.Media.Imaging;
 
 namespace SnakeWPF
 {
-    class Node
-    {
-        public int x;
-        public int y;
-        public int f;
-        public int g;
-        public int h;
-        public Node parent;
 
-        public Node(int x, int y)
-        {
-            this.x = x;
-            this.y = y;
-        }
-    }
     public class EnemyGameLogic
     {
         public int Rows { get; }
         public int Cols { get; }
-        public Direction Dir { get; set; }
-        public GridValue[,] Grid { get; }
-        private readonly LinkedList<Position> snakePositions = new LinkedList<Position>();
 
+        public GridValue[,] Grid { get; }
+        public Queue<Point> Snake = new Queue<Point>();
+        private Direction Dir { get; set; }
         public bool GameOver { get; private set; }
         private readonly Random random = new Random();
-
-        public Position FoodPos { get; set; }
-        public int foodCount { get; set; }
-        public string text { get; set; }
-        public int[,] map { get; set; }
+        private Point Mouse { get; set; }
+        public int FoodCount { get; set; }
+        public int rotation { get; set; }
         public EnemyGameLogic(int rows, int cols)
         {
             Rows = rows;
             Cols = cols;
-            foodCount = 0;
+            FoodCount = 0;
             Grid = new GridValue[rows, cols];
-            map = new int[rows, cols];
-            Step = 0;
+            TempPath = new Queue<Point>();
+            HamiltonPath = new List<Point>(rows * cols);
+            rotation = 90;
+            CreateHamiltonPath();
             AddSnake();
             AddFood();
-            FindPathToFood();
         }
 
         private void AddSnake()
@@ -69,21 +48,23 @@ namespace SnakeWPF
             for (int c = 1; c <= 3; c++)
             {
                 Grid[r, c] = GridValue.Snake;
-                snakePositions.AddFirst(new Position(r, c));
+                Snake.Enqueue(new Point(r, c));
             }
             GameOver = false;
         }
         private void AddFood()
         {
-
             List<Position> empty = new List<Position>(EmptyPositions());
             if (empty.Count == 0)
             {
+                System.Windows.MessageBox.Show("No way");
+                GameOver = true;
                 return;
             }
             Position pos = empty[random.Next(empty.Count)];
             Grid[pos.Row, pos.Col] = GridValue.Food;
-            FoodPos = pos;
+            Mouse = new Point(pos.Row, pos.Col);
+            CalculatePath();
         }
         private IEnumerable<Position> EmptyPositions()
         {
@@ -99,226 +80,378 @@ namespace SnakeWPF
             }
         }
 
+        
         public void Move()
         {
-            Position newHeadPos = GetNewDir();
-            
-            GridValue hit = WillHit(newHeadPos);
-            if (hit == GridValue.Outside || hit == GridValue.Snake)
+            SetDirection();
+            Point head = Snake.Last();
+            switch (Dir)
+            {
+                case Direction.Up:
+                    rotation = 0;
+                    Snake.Enqueue(new Point(head.X - 1, head.Y));
+                    break;
+                case Direction.Left:
+                    rotation = 270;
+                    Snake.Enqueue(new Point(head.X, head.Y - 1));
+                    break;
+                case Direction.Down:
+                    rotation = 180;
+                    Snake.Enqueue(new Point(head.X + 1, head.Y));
+                    break;
+                case Direction.Right:
+                    rotation = 90;
+                    Snake.Enqueue(new Point(head.X, head.Y + 1));
+                    break;
+            }
+            Point newHead = Snake.Last();
+            GridValue hit = WillHit(newHead);
+            if(hit == GridValue.Outside || hit == GridValue.Snake)
             {
                 GameOver = true;
             }
             else if (hit == GridValue.Empty)
             {
-                RemoveTail();
-                AddHead(newHeadPos);
+                Point tail = Snake.First();
+                Grid[tail.X, tail.Y] = GridValue.Empty;
+                Grid[newHead.X, newHead.Y] = GridValue.Snake;
+                Snake.Dequeue();
             }
             else if (hit == GridValue.Food)
             {
-                foodCount++;
-                AddHead(newHeadPos);
+                FoodCount++;
+                Grid[newHead.X, newHead.Y] = GridValue.Snake;
                 AddFood();
-                FindPathToFood();
-                
-
+            }
+            if (Snake.Count < StepsCountAfterCalculatePath)
+            {
+                CalculatePath();
             }
         }
 
-        private bool OutsideGrid(Position pos)
-        {
-            return pos.Row < 0 || pos.Row >= Rows || pos.Col < 0 || pos.Col >= Cols;
-        }
-
-        private GridValue WillHit(Position newHeadPos)
+        private GridValue WillHit(Point newHeadPos)
         {
             if (OutsideGrid(newHeadPos))
             {
+                GameOver = true;
                 return GridValue.Outside;
             }
-            return Grid[newHeadPos.Row, newHeadPos.Col];
+            if (newHeadPos == Snake.First())
+            {
+                return GridValue.Empty;
+            }
+            return Grid[newHeadPos.X, newHeadPos.Y];
+        }
+        private bool OutsideGrid(Point pos)
+        {
+            return pos.X < 0 || pos.X >= Rows || pos.Y < 0 || pos.Y >= Cols;
         }
 
+        //habr
+        private bool InvertHamiltonPath { get; set; }
+        private Queue<Point> TempPath { get; set; }
+        private int StepsCountAfterCalculatePath { get; set; }
+        private List<Point> HamiltonPath { get; set; }
 
-        private void AddHead(Position pos)
+        private void CreateHamiltonPath()
         {
-            snakePositions.AddFirst(pos);
-            Grid[pos.Row, pos.Col] = GridValue.Snake;
+            HamiltonPath.Clear();
+            HamiltonPath.Add(new Point(0, 0));
+            HamiltonStep(HamiltonPath.Last());
         }
-        private void RemoveTail()
+        private enum Direction { Up, Down, Left, Right }
+        private bool HamiltonStep(Point current)
         {
-            Position tail = snakePositions.Last.Value;
-            Grid[tail.Row, tail.Col] = GridValue.Empty;
-            snakePositions.RemoveLast();
-        }
-        public Position HeadPosition()
-        {
-            return snakePositions.First.Value;
-        }
-        public int Step { get; set; }
-        public List<(int, int)> directions { get; set; }
-        public Position GetNewDir()
-        {
-            var move = directions[0];
-            int x = move.Item1;
-            int y = move.Item2;
-            directions.RemoveAt(0);
-            text = Convert.ToString(x)+ " " + Convert.ToString(y);
-            Position dir = new Position(x,y);
-            return dir;
-        }
-        public void FindPathToFood()
-        {
-            int startX = snakePositions.First.Value.Row;
-            int startY = snakePositions.First.Value.Col;
-            int endX = FoodPos.Row;
-            int endY = FoodPos.Col;
-            //Если еда закрыта со всех сторон телом змейки или концом карты, попробуем найти безопасный путь
-            bool flag = false;
-            // Проверка наличия свободной клетки слева от искомой точки
-            if (endX > 0 && map[endX - 1, endY] == 0)
+            int xSize = Rows;
+            int ySize = Cols;
+
+            if (HamiltonPath.Count == HamiltonPath.Capacity)
             {
-                // есть свободная клетка слева
-                flag = true;
-            }
-            // Проверка наличия свободной клетки справа от искомой точки
-            if (endX < Rows - 1 && map[endX + 1, endY] == 0)
-            {
-                // есть свободная клетка справа
-                flag = true;
+                var first = HamiltonPath.First();
+                return (first.X == current.X && first.Y == current.Y - 1)
+                    || (first.X == current.X && first.Y == current.Y + 1)
+                    || (first.X - 1 == current.X && first.Y == current.Y)
+                    || (first.X + 1 == current.X && first.Y == current.Y);
             }
 
-            // Проверка наличия свободной клетки сверху от искомой точки
-            if (endY > 0 && map[endX, endY - 1] == 0)
+            foreach (var direction in new[] { Direction.Down, Direction.Right, Direction.Up, Direction.Left })
             {
-                // есть свободная клетка сверху
-                flag = true;
+                Point newElement = new(0,0);
+                switch (direction)
+                {
+                    case Direction.Up:
+                        newElement = new Point(current.X - 1, current.Y);
+                        break;
+                    case Direction.Left:
+                        newElement = new Point(current.X, current.Y - 1);
+                        break;
+                    case Direction.Down:
+                        newElement = new Point(current.X + 1, current.Y);
+                        break;
+                    case Direction.Right:
+                        newElement = new Point(current.X, current.Y + 1);
+                        break;
+                }
+                if (0 <= newElement.X && newElement.X < xSize
+                    && 0 <= newElement.Y && newElement.Y < ySize
+                    && !HamiltonPath.Contains(newElement))
+                {
+                    HamiltonPath.Add(newElement);
+                    if (HamiltonStep(newElement))
+                    {
+                        return true;
+                    }
+                    HamiltonPath.Remove(newElement);
+                }
             }
+            return false;
+        }
 
-            // Проверка наличия свободной клетки снизу от искомой точки
-            if (endY < Cols - 1 && map[endX, endY + 1] == 0)
+        private void SetDirection()
+        {
+            Point head = Snake.Last();
+            int currentIndnex = HamiltonPath.FindIndex(p => p.X == head.X && p.Y == head.Y);
+            Point currentElement = HamiltonPath[currentIndnex];
+            Point nextElement = new(0,0);
+            if (TempPath.Count > 0)
             {
-                // есть свободная клетка снизу
-                flag = true;
-            }
-            if (flag)
-            {
-                List<(int, int)> path = FindPath(startX, startY, endX, endY, map);
-                directions = path;
+                nextElement = TempPath.Dequeue();
             }
             else
             {
-                
-                List<(int, int)> path = FindSavePath();
-                directions = path;
-                
+                StepsCountAfterCalculatePath++;
+                if (InvertHamiltonPath)
+                {
+                    nextElement = (currentIndnex - 1 < 0) ? HamiltonPath[HamiltonPath.Count - 1] : HamiltonPath[currentIndnex - 1];
+                }
+                else
+                {
+                    nextElement = (currentIndnex + 1 == HamiltonPath.Count) ? HamiltonPath[0] : HamiltonPath[currentIndnex + 1];
+                }
             }
+
+            if (currentElement.X < nextElement.X && currentElement.Y == nextElement.Y)
+            {
+                Dir = Direction.Down;
+                return;
+            }
+
+            if (currentElement.X == nextElement.X && currentElement.Y < nextElement.Y)
+            {
+                Dir = Direction.Right;
+                return;
+            }
+
+            if (currentElement.X > nextElement.X && currentElement.Y == nextElement.Y)
+            {
+                Dir = Direction.Up;
+                return;
+            }
+
+            if (currentElement.X == nextElement.X &&  currentElement.Y > nextElement.Y)
+            {
+                Dir = Direction.Left;
+                return;
+            }
+
             
+
             
         }
-        public List<(int,int)> FindSavePath()
+        private void CalculatePath()
         {
-            List<(int, int)> directions = new List<(int, int)>
+            StepsCountAfterCalculatePath = 0;
+            int finalIndexPoint = HamiltonPath.FindIndex(p => p.X == Mouse.X && p.Y == Mouse.Y);
+            List<Point> tempPath = new List<Point>();
+            List<Point> points = Snake.Select(p => new Point(p.X, p.Y)).ToList();
+            List<Point> stepPiton = new List<Point>(points);
+            int index = 0;
+            var result = StepTempPath(ref index, GetInvert(stepPiton, Mouse), Snake.Last(), finalIndexPoint, stepPiton, tempPath);
+            if (result.PathIsFound)
             {
-                (1, 1),
-                (1, 3)
-            };
-            return directions;
+                TempPath = new Queue<Point>(tempPath);
+                InvertHamiltonPath = result.InvertHamiltonPath;
+            }
         }
-        static List<(int, int)> FindPath(int startX, int startY, int endX, int endY, int[,] map)
+        private bool GetInvert(List<Point> stepPiton, Point finalPoint)
         {
-            Node startNode = new Node(startX, startY);
-            Node endNode = new Node(endX, endY);
-            List<Node> openList = new List<Node>() { startNode };
-            HashSet<Node> closedList = new HashSet<Node>();
-
-            while (openList.Count > 0)
+            if (Snake.Count > 1)
             {
-                Node current = openList[0];
+                int pitonDirection = stepPiton.Last().Y - stepPiton[stepPiton.Count - 2].Y;
+                int mouseDirection = stepPiton.Last().Y - finalPoint.Y;
+                return (pitonDirection < 0 && mouseDirection < 0) || (pitonDirection > 0 && mouseDirection > 0);
+            }
+            return false;
+        }
 
-                for (int i = 1; i < openList.Count; i++)
+        class ResultAnlaizePath
+        {
+            public bool PathIsFound { get; set; }
+            public bool InvertHamiltonPath { get; set; }
+            public ResultAnlaizePath(bool pathIsFound, bool invertHamiltonPath = false)
+            {
+                PathIsFound = pathIsFound;
+                InvertHamiltonPath = invertHamiltonPath;
+            }
+        }
+        private ResultAnlaizePath StepTempPath(ref int index, bool invert, Point current, int finalIndexPoint, List<Point> stepPiton, List<Point> tempPath)
+        {
+            index++;
+            if (HamiltonPath.Count < index)
+            {
+                return new ResultAnlaizePath(false);
+            }
+            var finalPoint = HamiltonPath[finalIndexPoint];
+            if (current.X == finalPoint.X && current.Y == finalPoint.Y)
+            {
+                if (Snake.Count == 1)
                 {
-                    if (openList[i].f < current.f)
-                    {
-                        current = openList[i];
-                    }
+                    return new ResultAnlaizePath(true);
                 }
-
-                openList.Remove(current);
-                closedList.Add(current);
-
-                if (current.x == endX && current.y == endY)
+                foreach (var d in new[] { false, true })
                 {
-                    List<(int, int)> path = new List<(int, int)>();
-                    Node node = current;
-
-                    while (node != null)
+                    var tempPiton = stepPiton.TakeLast(Snake.Count).ToList();
+                    bool isFound = true;
+                    bool invertHamiltonPath = d;
+                    for (int j = 1; j < Snake.Count; j++)
                     {
-                        path.Add((node.x, node.y));
-                        node = node.parent;
-                    }
-
-                    path.Reverse();
-                    return path;
-                }
-
-                foreach (Node neighbor in GetNeighbors(current,map))
-                {
-                    if (neighbor == null || closedList.Contains(neighbor))
-                    {
-                        continue;
-                    }
-
-                    int newCost = current.g + 1;
-
-                    if (newCost < neighbor.g || !openList.Contains(neighbor))
-                    {
-                        neighbor.g = newCost;
-                        neighbor.h = CalculateHeuristic(neighbor, endNode);
-                        neighbor.f = neighbor.g + neighbor.h;
-                        neighbor.parent = current;
-
-                        if (!openList.Contains(neighbor))
+                        Point hamiltonPoint;
+                        if (invertHamiltonPath)
                         {
-                            openList.Add(neighbor);
+                            hamiltonPoint = (finalIndexPoint - j >= 0) ? HamiltonPath[finalIndexPoint - j] : HamiltonPath[HamiltonPath.Count - j];
                         }
+                        else
+                        {
+                            hamiltonPoint = (finalIndexPoint + j < HamiltonPath.Count) ? HamiltonPath[finalIndexPoint + j] : HamiltonPath[finalIndexPoint + j - HamiltonPath.Count];
+                        }
+                        if (tempPiton.TakeLast(Snake.Count).Contains(hamiltonPoint))
+                        {
+                            isFound = false;
+                            break;
+                        }
+                        tempPiton.Add(hamiltonPoint);
+                    }
+                    if (isFound)
+                    {
+                        return new ResultAnlaizePath(true, invertHamiltonPath);
                     }
                 }
+                return new ResultAnlaizePath(false);
             }
-            return null;
-        }
-
-        static List<Node> GetNeighbors(Node node, int[,] map)
-        {
-            List<Node> neighbors = new List<Node>();
-
-            if (node.x > 0 && map[node.x - 1, node.y] != 1)
+            if ((Rows + Cols * 2) <= tempPath.Count)
             {
-                neighbors.Add(new Node(node.x - 1, node.y));
+                return new ResultAnlaizePath(false);
             }
+            Point newElement = new(0,0);
 
-            if (node.y > 0 && map[node.x, node.y - 1] != 1)
+            if (invert)
             {
-                neighbors.Add(new Node(node.x, node.y - 1));
+                if (current.X < finalPoint.X)
+                {
+                    newElement = new Point(current.X + 1, current.Y);
+                }
+                else if (finalPoint.X < current.X)
+                {
+                    newElement = new Point(current.X - 1, current.Y);
+                }
+                else if (current.Y < finalPoint.Y)
+                {
+                    newElement = new Point(current.X, current.Y + 1);
+                }
+                else if (finalPoint.Y < current.Y)
+                {
+                    newElement = new Point(current.X, current.Y - 1);
+                }
             }
-
-            if (node.x < map.GetLength(0) - 1 && map[node.x + 1, node.y] != 1)
+            else
             {
-                neighbors.Add(new Node(node.x + 1, node.y));
+                if (current.Y < finalPoint.Y)
+                {
+                    newElement = new Point(current.X, current.Y + 1);
+                }
+                else if (finalPoint.Y < current.Y)
+                {
+                    newElement = new Point(current.X, current.Y - 1);
+                }
+                else if (current.X < finalPoint.X)
+                {
+                    newElement = new Point(current.X + 1, current.Y);
+                }
+                else if (finalPoint.X < current.X)
+                {
+                    newElement = new Point(current.X - 1, current.Y);
+                }
             }
 
-            if (node.y < map.GetLength(1) - 1 && map[node.x, node.y + 1] != 1)
+            if (!stepPiton.TakeLast(Snake.Count).Contains(newElement))
             {
-                neighbors.Add(new Node(node.x, node.y + 1));
+                tempPath.Add(newElement);
+                stepPiton.Add(newElement);
+                var retult = StepTempPath(ref index, !invert, newElement, finalIndexPoint, stepPiton, tempPath);
+                if (retult.PathIsFound)
+                {
+                    return retult;
+                }
+                if (HamiltonPath.Count < index)
+                {
+                    return new ResultAnlaizePath(false);
+                }
+                tempPath.Remove(newElement);
+                stepPiton.Remove(newElement);
             }
 
-            return neighbors;
-        }
-        static int CalculateHeuristic(Node node, Node endNode)
-        {
-            int dx = Math.Abs(node.x - endNode.x);
-            int dy = Math.Abs(node.y - endNode.y);
+            Point nextFinalPoint;
+            if (this.InvertHamiltonPath)
+            {
+                nextFinalPoint = (finalIndexPoint - 1 < 0) ? HamiltonPath[HamiltonPath.Count - 1] : HamiltonPath[finalIndexPoint - 1];
+            }
+            else
+            {
+                nextFinalPoint = (finalIndexPoint + 1 == HamiltonPath.Count) ? HamiltonPath[0] : HamiltonPath[finalIndexPoint + 1];
+            }
+            List<Direction> directions = new List<Direction>(4);
+            directions.Add(finalPoint.Y < nextFinalPoint.Y ? Direction.Left : Direction.Right);
+            directions.Add(finalPoint.X < nextFinalPoint.X ? Direction.Up : Direction.Down);
+            directions.Add(finalPoint.Y < nextFinalPoint.Y ? Direction.Right : Direction.Left);
+            directions.Add(finalPoint.X < nextFinalPoint.X ? Direction.Down : Direction.Up);
 
-            return dx + dy;
+            foreach (var direction in directions)
+            {
+                switch (direction)
+                {
+                    case Direction.Up:
+                        newElement = new Point(current.X - 1, current.Y);
+                        break;
+                    case Direction.Left:
+                        newElement = new Point(current.X, current.Y - 1);
+                        break;
+                    case Direction.Down:
+                        newElement = new Point(current.X + 1, current.Y);
+                        break;
+                    case Direction.Right:
+                        newElement = new Point(current.X, current.Y + 1);
+                        break;
+                }
+                if (0 <= newElement.X && newElement.X < Rows
+                 && 0 <= newElement.Y && newElement.Y < Cols
+                 && !stepPiton.TakeLast(Snake.Count).Contains(newElement))
+                {
+                    tempPath.Add(newElement);
+                    stepPiton.Add(newElement);
+                    var retult = StepTempPath(ref index, GetInvert(stepPiton, finalPoint), newElement, finalIndexPoint, stepPiton, tempPath);
+                    if (retult.PathIsFound)
+                    {
+                        return retult;
+                    }
+                    if (HamiltonPath.Count < index)
+                    {
+                        return new ResultAnlaizePath(false);
+                    }
+                    tempPath.Remove(newElement);
+                    stepPiton.Remove(newElement);
+                }
+            }
+            return new ResultAnlaizePath(false);
         }
     }
 }
