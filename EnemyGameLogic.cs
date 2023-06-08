@@ -103,7 +103,7 @@ namespace SnakeWPF
                     Snake.Enqueue(new Point(head.X - 1, head.Y)); //добавляет новую точку в тело змейки
                     break;
                 case Direction.Left:
-                    Rotation = 270; //определяет угол поворота при движении влево
+                    Rotation = -90; //определяет угол поворота при движении влево
                     Snake.Enqueue(new Point(head.X, head.Y - 1)); //добавляет новую точку в тело змейки
                     break;
                 case Direction.Down:
@@ -232,7 +232,7 @@ namespace SnakeWPF
             }
             else //иначе берет следующую точку из основного пути
             {
-                StepsCountAfterCalculatePath+=16; //увеличивает счетчик количества шагов после расчета пути
+                StepsCountAfterCalculatePath+=8; //увеличивает счетчик количества шагов после расчета пути
                 if (InvertHamiltonPath) //если путь инвертирован берет предыдущую точку
                 {
                     nextElement = (currentIndnex - 1 < 0) ? HamiltonPath[HamiltonPath.Count - 1] : HamiltonPath[currentIndnex - 1];
@@ -290,10 +290,15 @@ namespace SnakeWPF
                 InvertHamiltonPath = result.InvertHamiltonPath;
             }
         }
-        private bool GetInvert(List<Point> stepPiton, Point finalPoint) //метод проверки, что нужно идти в обратном направлении
+        private static bool GetInvert(List<Point> stepPiton, Point finalPoint) //метод проверки, что нужно идти в обратном направлении
         {
             int pitonDirection = stepPiton.Last().Y - stepPiton[stepPiton.Count - 2].Y;
             int foodDirection = stepPiton.Last().Y - finalPoint.Y;
+            //System.Windows.MessageBox.Show("pDir = " + Convert.ToString(stepPiton.Last().Y - stepPiton[stepPiton.Count - 2].Y) +
+            //    "\n"
+            //   + "fDir = " + Convert.ToString(stepPiton.Last().Y - finalPoint.Y)
+            //   + "\n" + Convert.ToString(stepPiton.Last().Y) + " - " + Convert.ToString(stepPiton[stepPiton.Count - 2].Y) + "\n"
+            //   + "-" + Convert.ToString(finalPoint.Y));
             return (pitonDirection < 0 && foodDirection < 0) || (pitonDirection > 0 && foodDirection > 0);
         }
 
@@ -360,61 +365,31 @@ namespace SnakeWPF
                 }
                 return new ResultAnlaizePath(false);
             }
-
-            // Проверка, достигнуто ли ограничение на количество элементов во временном пути
-            if ((Rows + Cols * 2) <= tempPath.Count)
-            {
-                return new ResultAnlaizePath(false);
-            }
-
             Point newElement = new(0, 0);
 
-            // Вычисление следующую точку пути
-            if (invert)
+            // Вычисление следующей точки
+            if (current.Y < finalPoint.Y)
             {
-                if (current.X < finalPoint.X)
-                {
-                    newElement = new Point(current.X + 1, current.Y);
-                }
-                else if (finalPoint.X < current.X)
-                {
-                    newElement = new Point(current.X - 1, current.Y);
-                }
-                else if (current.Y < finalPoint.Y)
-                {
-                    newElement = new Point(current.X, current.Y + 1);
-                }
-                else if (finalPoint.Y < current.Y)
-                {
-                    newElement = new Point(current.X, current.Y - 1);
-                }
+                newElement = new Point(current.X, current.Y + 1);
             }
-            else
+            else if (finalPoint.Y < current.Y)
             {
-                if (current.Y < finalPoint.Y)
-                {
-                    newElement = new Point(current.X, current.Y + 1);
-                }
-                else if (finalPoint.Y < current.Y)
-                {
-                    newElement = new Point(current.X, current.Y - 1);
-                }
-                else if (current.X < finalPoint.X)
-                {
-                    newElement = new Point(current.X + 1, current.Y);
-                }
-                else if (finalPoint.X < current.X)
-                {
-                    newElement = new Point(current.X - 1, current.Y);
-                }
+                newElement = new Point(current.X, current.Y - 1);
             }
-
+            else if (current.X < finalPoint.X)
+            {
+                newElement = new Point(current.X + 1, current.Y);
+            }
+            else if (finalPoint.X < current.X)
+            {
+                newElement = new Point(current.X - 1, current.Y);
+            }
             // Проверка, не содержит ли новый элемент змейку
             if (!stepPiton.TakeLast(Snake.Count).Contains(newElement))
             {
                 tempPath.Add(newElement);
                 stepPiton.Add(newElement);
-                var retult = StepTempPath(ref index, !invert, newElement, finalIndexPoint, stepPiton, tempPath);
+                var retult = StepTempPath(ref index, invert, newElement, finalIndexPoint, stepPiton, tempPath);
 
                 // Если путь найден, вернуть результат
                 if (retult.PathIsFound)

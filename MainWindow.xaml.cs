@@ -25,7 +25,7 @@ namespace SnakeWPF
             {Direction.Up, 0},
             {Direction.Right,90 },
             {Direction.Down,180 },
-            {Direction.Left,270 }
+            {Direction.Left,-90 }
         };
         public MainWindow() //конструктор класса MainWindow
         {

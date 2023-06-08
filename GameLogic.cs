@@ -41,7 +41,7 @@ namespace SnakeWPF
     }
     public class GameLogic //определение класса GameLogic, отвечающего за логику движения змейки игрока
     {
-        public int Rows { get; } //переменные для хранения кол-ва строк
+        public int Rows { get; } //свойства для хранения кол-ва строк
         public int Cols { get; } //и столбцов
         public Direction Dir { get; private set; } //переменная для хранения направления движения змейки
         private readonly LinkedList<Position> snakePositions = new(); //связанный список позиций змейки
@@ -70,7 +70,6 @@ namespace SnakeWPF
             {
                 UpdateCell(new Position(r, c), Images.Body); //устанавливает изображение "Body" змейки в заданной позиции
                 snakePositions.AddFirst(new Position(r, c)); //добавляет новую клетку тела змейки в список ее тела
-                
             }
             GameOver = false; //сбрасывает флаг окончания игры
         }
