@@ -1,182 +1,120 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 
 namespace SnakeWPF
 {
-    /// <summary>
-    /// Interaction logic for MainWindow.xaml
-    /// </summary>
-    public partial class MainWindow : Window
+    public partial class MainWindow : Window //объявление класса MainWindow, который наследуется от Window
     {
-        private readonly Dictionary<GridValue, ImageSource> gridValToImage = new()
-        {
-            {GridValue.Empty, Images.Empty },
-            {GridValue.Snake, Images.Body },
-            {GridValue.Food, Images.Food  },
-        };
-
-        private readonly Dictionary<Direction, int> dirToRot = new()
-        {
-            { Direction.Up, 0},
-            { Direction.Right, 90},
-            { Direction.Down, 180 },
-            { Direction.Left, 270}
-        };
-
-
-        private readonly int rows = 14, cols = 14;
-        private readonly Image[,] PgridImages;
-        private readonly Image[,] EgridImages;
+        private readonly int rows = 26, cols = 26; //объявление констант rows и cols со значениями 26 (размер игровой сетки)
+        //объявление двумерных массивов изображений для сеток игрока и компьютера
+        private Image[,] PgridImages;
+        private Image[,] EgridImages;
+        //объекты логики игры игрока и компьютера
         private GameLogic PgameLogic;
-        private EnemyGameLogic EgameLogic;
 
-        private StreamWriter logfile;
-
-        public MainWindow()
+        private readonly Dictionary<Direction, int> dirToRotation = new() //словарь содержащий соответствие направлений и угла поворота изображения
         {
-            
-            InitializeComponent();
+            {Direction.Up, 0},
+            {Direction.Right,90 },
+            {Direction.Down,180 },
+            {Direction.Left,270 }
+        };
+        public MainWindow() //конструктор класса MainWindow
+        {
+            InitializeComponent(); //инициализация компонентов на форме
+            //создание сеток для изображений игрока и компьютера
             PgridImages = CreateGrid(playerGrid);
             EgridImages = CreateGrid(enemyGrid);
-            PgameLogic = new GameLogic(rows, cols);
-            EgameLogic = new EnemyGameLogic(rows, cols);
-            logfile = new StreamWriter("log.txt");
+            
+            PgameLogic = new GameLogic(rows, cols, PgridImages); //инициализация игровой логики для игрока
         }
 
-
-        public Image[,] CreateGrid(UniformGrid gridName)
+        //метод для создания сетки изображений Image в сетке UniformGrid, в которой все элементы будут одинакового размера
+        public Image[,] CreateGrid(UniformGrid gridName) 
         {
-            Image[,] images = new Image[rows, cols];
-            gridName.Rows = rows;
-            gridName.Columns = cols;
-            
-            for(int r = 0; r < rows; r++)
+            Image[,] images = new Image[rows, cols]; //создание массива изображений с заданными размерами
+            gridName.Rows = rows;       //присвоение количества строк
+            gridName.Columns = cols;    //и столбцов сетке UniformGrid
+            for (int r = 0; r < rows; r++) //проход по каждому элементу сетки для добавления отдельного изображения Image
             {
-                for(int c = 0; c < cols; c++)
+                for (int c = 0; c < cols; c++)
                 {
-                    Image image = new()
+                    Image image = new() //создание нового объекта Image и задание начальных свойств изображения 
                     {
-                        Source = Images.Empty,
-                        RenderTransformOrigin = new Point(0.5, 0.5)
+                        Source = Images.Empty, //изначально все элементы сетки имеют пустое изображение
+                        RenderTransformOrigin = new Point(0.5, 0.5) //точка преобразования координат для поворота изображения
                     };
+                    //добавление созданного изображения в массив и на сетку
                     images[r, c] = image;
                     gridName.Children.Add(image);
                 }
             }
-            return images;
-
+            return images; //возвращает созданный массив изображений
         }
 
-        private async Task RunGame()
+
+        private static void ClearGrid(Image[,] gridName) //метод для очистки всех ячеек в сетке изображений
         {
-            Draw(PgridImages);
-            Draw(EgridImages);
-            Overlay.Visibility = Visibility.Hidden;
-            await GameLoop();
-            await ShowGameOver();
-            PgameLogic = new GameLogic(rows, cols);
-            EgameLogic = new EnemyGameLogic(rows, cols);
+            foreach (var image in gridName) //перебор всех изображений в сетке
+            {
+                image.Source = Images.Empty; //устанавливает для каждого элемента пустое изображение
+            }
         }
-        private async void Window_StartKeyDown(object sender, KeyEventArgs e)
+
+        private async Task RunGame() //метод, запускающий игру
         {
-            if (Overlay.Visibility == Visibility.Visible)
+            Overlay.Visibility = Visibility.Hidden; //срывает оверлей
+            await GameLoop(); //ничанает цикл игры
+            await ShowGameOver(); //показывает экран окончания игры
+            ClearGrid(PgridImages); //очищает сетки игрока
+            ClearGrid(EgridImages); //и компьютера
+            PgameLogic = new GameLogic(rows, cols, PgridImages);            //создает новые объекты классов GameLogic и EnemyGameLogic, используя
+            //переменные PgameLogic и EgameLogic являются ссылками на заново созданные объекты классов GameLogic и EnemyGameLogic
+        }
+        private async void Window_StartKeyDown(object sender, KeyEventArgs e) //обработчик события нажатия клавиши для начала игры
+        {
+            if (Overlay.Visibility == Visibility.Visible) //если оверлей видимый, то отменяет обработкку события
             {
                 e.Handled = true;
             }
-            if (!gameRunning)
+            if (!gameRunning) //если игра не запущена, то запускает ее и дожидается завершения
             {
                 gameRunning = true;
                 await RunGame();
                 gameRunning = false;
             }
         }
-        bool gameRunning = false;
-        private async Task ShowGameOver()
+        bool gameRunning = false; //устанавливает флаг окончания игры
+        private async Task ShowGameOver() //асинхронный метод показа экрана завершения игры
         {
-            await Task.Delay(500);
-            Overlay.Visibility = Visibility.Visible;
+            await Task.Delay(500); //задержка в 0.5 секунды
+            Overlay.Visibility = Visibility.Visible; //установка видимости оверлея на экране
         }
-        private void Draw(Image[,] gridImg)
-        {
-            DrawGrid(gridImg);
-            DrawSnakeHead(gridImg);
-        }
-        public long astralstep = 0;  
-        private void DrawGrid(Image[,] gridImg)
-        {
-            astralstep++;
-            if (gridImg == PgridImages)
-            {
-                for (int r = 0; r < rows; r++)
-                {
-                    for (int c = 0; c < cols; c++)
-                    {
-                        GridValue gridVal = PgameLogic.Grid[r, c];
-                        gridImg[r, c].Source = gridValToImage[gridVal];
-                        gridImg[r, c].RenderTransform = Transform.Identity;
-                    }
-                }
-            }
-            else
-            {
-                
-                for (int r = 0; r < rows; r++)
-                {
-                    for (int c = 0; c < cols; c++)
-                    {
-                        GridValue gridVal = EgameLogic.Grid[r, c];
-                        logfile.Write(gridVal.ToString());
-                        gridImg[r, c].Source = gridValToImage[gridVal];
-                        gridImg[r, c].RenderTransform = Transform.Identity;
-                    }
-                    logfile.WriteLine();
-                }
-                logfile.WriteLine(Convert.ToString(astralstep));
-            }
-        }
-
-        private void DrawSnakeHead(Image[,] gridImg)
+       
+        private void DrawSnakeHead(Image[,] gridImg) //метод для отображения головы змейки
         {
             if (gridImg == PgridImages)
             {
-                Position headPos = PgameLogic.HeadPosition();
-                Image image = PgridImages[headPos.Row, headPos.Col];
-                image.Source = Images.Head;
-
-                int rotation = dirToRot[PgameLogic.Dir];
-                image.RenderTransform = new RotateTransform(rotation);
-            }
-            else
-            {
-                var headPos = EgameLogic.Snake.Last();
-                Image image = EgridImages[headPos.X, headPos.Y];
-                image.Source = Images.AngryHead;
-                image.RenderTransform = new RotateTransform(EgameLogic.rotation);
+                var headPos = PgameLogic.HeadPosition(); //получение координат головы змейки игрока
+                gridImg[headPos.Row, headPos.Col].Source = Images.Head; //установка изображения головы змейки на сетке
+                int rotation = dirToRotation[PgameLogic.Dir]; //получение угла поворота головы, отностиельно текущего направления движения 
+                gridImg[headPos.Row, headPos.Col].RenderTransform = new RotateTransform(rotation); //установка поворота головы на игровом поле
             }
         }
-
-        private void Window_KeyDown(object sender, KeyEventArgs e)
+        private void Window_KeyDown(object sender, KeyEventArgs e) //обработчик события нажатия клавиши
         {
-            if (PgameLogic.GameOver)
+            if (PgameLogic.GameOver) //если игра закончилась, то прекращаем обработку
             {
                 return;
             }
-            switch (e.Key)
+            switch (e.Key) //обрабатывает нажатие на стрелки клавиатуры
             {
                 case Key.Left:
                     PgameLogic.ChangeDirection(Direction.Left);
@@ -193,68 +131,54 @@ namespace SnakeWPF
             }
         }
 
-        private async Task GameLoop()
+        private enum Speed //перечисление, задающее скорость движения змейки в игре 
         {
-            Draw(PgridImages);
-            Draw(EgridImages);
-            while (StopGame())
-            {
-                await Task.Delay(150);
-                PgameLogic.Move();
-                Draw(PgridImages);
-                EgameLogic.Move();
-                if (!EgameLogic.GameOver)
-                {
-                    Draw(EgridImages);
-                }
-                PlayerScore.Text = "SCORE " + Convert.ToString(PgameLogic.FoodCount);
-                EnemyScore.Text ="SCORE " + Convert.ToString(EgameLogic.FoodCount);
-            }
-            EnemyWins.Text = "Wins: " + Convert.ToString(EnemyWinCount);
-            PlayerWins.Text = "Wins: " + Convert.ToString(PlayerWinCount);
+            LateGame = 25,
+            MidGame = 60,
+            NormGame = 90,
+            StartGame = 100
         }
 
-        public int EnemyWinCount = 0;
-        public int PlayerWinCount = 0;
-
-        private bool StopGame()
+        private int ChangeSpeed() //метод для изменения скорости движения змейки
         {
-            
-            if (PgameLogic.GameOver && !EgameLogic.GameOver)
+            if (PgameLogic.GameOver) //если игрок проиграл, то устанавливает максимальную скорость
             {
-                if(EgameLogic.FoodCount > PgameLogic.FoodCount)
-                {
-                    MessageBox.Show("Компютер победил");
-                    EnemyWinCount++;
-                    return false;
-                }
-                else
-                {
-                    return true;
-                }
+                return (int)Speed.LateGame;
             }
-            else if (EgameLogic.GameOver && !PgameLogic.GameOver)
+            if (PgameLogic.FoodCount > (rows * cols - (rows * cols) / 2))
             {
-                if(PgameLogic.FoodCount > EgameLogic.FoodCount)
-                {
-                    MessageBox.Show("Человек крут");
-                    PlayerWinCount++;
-                    return false;
-                }
-                else
-                {
-                    return true;
-                }
+                return (int)Speed.LateGame;
             }
-            else if (EgameLogic.GameOver && PgameLogic.GameOver)
+            else if (PgameLogic.FoodCount > (rows * cols - (rows * cols) / 1.5))
             {
-                return false;
+                return (int)Speed.MidGame;
             }
-            else
+            else if (PgameLogic.FoodCount > (rows * cols - (rows * cols) / 1.3))
             {
-                return true;
+                return (int)Speed.NormGame;
             }
-            
+            else //иначе устанавливает начальную скорость
+            {
+                return (int)Speed.StartGame;
+            }
         }
+
+        private async Task GameLoop() //асинхронный метод, зацикливающий игру
+        {
+            while (!PgameLogic.GameOver) //выполняется, StopGame не будет равен false
+            {
+                await Task.Delay(ChangeSpeed()); //задержка на период скорости передвижения змейки
+                PgameLogic.Move(); //перемещение змейки игрока
+                DrawSnakeHead(PgridImages); //рисует голову змейки игрока на сетке
+                PlayerScore.Text = "SCORE: " + Convert.ToString(PgameLogic.FoodCount);      //обновляет значение счета игрока
+                                                        
+            }
+            EnemyWins.Text = "Wins: " + Convert.ToString(EnemyWinCount);                    //обновляет значение побед игрока
+            PlayerWins.Text = "Wins: " + Convert.ToString(PlayerWinCount);                  //и компьютера на экране
+        }
+
+        public int EnemyWinCount = 0;       //счетчики побед игрока
+        public int PlayerWinCount = 0;      //и компьютера
+
     }
 }

@@ -26,10 +26,7 @@
     <Resource Include="Assets\AngryHead.png" />
     <Resource Include="Assets\Apple.png" />
     <Resource Include="Assets\Body.png" />
-    <Resource Include="Assets\DeadBody.png" />
-    <Resource Include="Assets\DeadHead.png" />
     <Resource Include="Assets\Empty.png" />
-    <Resource Include="Assets\Food.png" />
     <Resource Include="Assets\Head.png" />
   </ItemGroup>
 

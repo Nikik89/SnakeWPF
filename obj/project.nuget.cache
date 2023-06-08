@@ -1,11 +1,11 @@
 {
   "version": 2,
-  "dgSpecHash": "D59uwVWnS/W2Cbf6060rP39tYYWLF9n5VlMthCL01791SZplHPZJaDz1l/ZlOaIRhr7fnqstfhWLThjNlzLoyw==",
+  "dgSpecHash": "PJyEfTFlGe4grCUkoGIM+uxt/lHTlDlE7rWfN/NNQTAW40B8QsLObbxSWE8AY9aSR/YvPSZ8F6dqt4XAJEbq2g==",
   "success": true,
-  "projectFilePath": "C:\\Users\\sdasf\\Documents\\GitHub\\SnakeWPFwithAI\\SnakeWPF.csproj",
+  "projectFilePath": "C:\\Users\\Alex\\Desktop\\Snake\\SnakeWPF.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\sdasf\\.nuget\\packages\\lucene.net\\3.0.3\\lucene.net.3.0.3.nupkg.sha512",
-    "C:\\Users\\sdasf\\.nuget\\packages\\sharpziplib\\0.86.0\\sharpziplib.0.86.0.nupkg.sha512"
+    "C:\\Users\\Alex\\.nuget\\packages\\lucene.net\\3.0.3\\lucene.net.3.0.3.nupkg.sha512",
+    "C:\\Users\\Alex\\.nuget\\packages\\sharpziplib\\0.86.0\\sharpziplib.0.86.0.nupkg.sha512"
   ],
   "logs": [
     {
