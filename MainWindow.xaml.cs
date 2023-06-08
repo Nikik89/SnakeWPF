@@ -18,6 +18,7 @@ namespace SnakeWPF
         private Image[,] EgridImages;
         //объекты логики игры игрока и компьютера
         private GameLogic PgameLogic;
+        private EnemyGameLogic EgameLogic;
 
         private readonly Dictionary<Direction, int> dirToRotation = new() //словарь содержащий соответствие направлений и угла поворота изображения
         {
@@ -34,6 +35,8 @@ namespace SnakeWPF
             EgridImages = CreateGrid(enemyGrid);
             
             PgameLogic = new GameLogic(rows, cols, PgridImages); //инициализация игровой логики для игрока
+            
+            EgameLogic = new EnemyGameLogic(rows, cols, EgridImages); //инициализация игровой логики для компьютера
         }
 
         //метод для создания сетки изображений Image в сетке UniformGrid, в которой все элементы будут одинакового размера
@@ -76,6 +79,8 @@ namespace SnakeWPF
             ClearGrid(PgridImages); //очищает сетки игрока
             ClearGrid(EgridImages); //и компьютера
             PgameLogic = new GameLogic(rows, cols, PgridImages);            //создает новые объекты классов GameLogic и EnemyGameLogic, используя
+            EgameLogic = new EnemyGameLogic(rows, cols, EgridImages);       //переданные параметры rows, cols и PgridImages/EgridImages
+
             //переменные PgameLogic и EgameLogic являются ссылками на заново созданные объекты классов GameLogic и EnemyGameLogic
         }
         private async void Window_StartKeyDown(object sender, KeyEventArgs e) //обработчик события нажатия клавиши для начала игры
@@ -106,6 +111,13 @@ namespace SnakeWPF
                 gridImg[headPos.Row, headPos.Col].Source = Images.Head; //установка изображения головы змейки на сетке
                 int rotation = dirToRotation[PgameLogic.Dir]; //получение угла поворота головы, отностиельно текущего направления движения 
                 gridImg[headPos.Row, headPos.Col].RenderTransform = new RotateTransform(rotation); //установка поворота головы на игровом поле
+            }
+            else if (!EgameLogic.GameOver)
+            {
+                var headPos = EgameLogic.Snake.Last(); //получение координат головы змейки компьютера
+                Image image = EgridImages[headPos.X, headPos.Y]; //установка изображения
+                image.Source = Images.AngryHead;                 // головы змейки на сетке
+                image.RenderTransform = new RotateTransform(EgameLogic.Rotation); //получение угла поворота головы, относительно текущего направления движения
             }
         }
         private void Window_KeyDown(object sender, KeyEventArgs e) //обработчик события нажатия клавиши
@@ -165,13 +177,18 @@ namespace SnakeWPF
 
         private async Task GameLoop() //асинхронный метод, зацикливающий игру
         {
-            while (!PgameLogic.GameOver) //выполняется, StopGame не будет равен false
+            while (StopGame()) //выполняется, StopGame не будет равен false
             {
                 await Task.Delay(ChangeSpeed()); //задержка на период скорости передвижения змейки
                 PgameLogic.Move(); //перемещение змейки игрока
                 DrawSnakeHead(PgridImages); //рисует голову змейки игрока на сетке
+                EgameLogic.Move(); //перемещение змейки компьютера
+                if (!EgameLogic.GameOver) //если игра еще не закончилась
+                {
+                    DrawSnakeHead(EgridImages); //рисует голову змейки компьютера
+                }
                 PlayerScore.Text = "SCORE: " + Convert.ToString(PgameLogic.FoodCount);      //обновляет значение счета игрока
-                                                        
+                EnemyScore.Text = "SCORE: " + Convert.ToString(EgameLogic.FoodCount);       //и компьютера на экране
             }
             EnemyWins.Text = "Wins: " + Convert.ToString(EnemyWinCount);                    //обновляет значение побед игрока
             PlayerWins.Text = "Wins: " + Convert.ToString(PlayerWinCount);                  //и компьютера на экране
@@ -180,5 +197,33 @@ namespace SnakeWPF
         public int EnemyWinCount = 0;       //счетчики побед игрока
         public int PlayerWinCount = 0;      //и компьютера
 
+        private bool StopGame() //метод, проверяющий закончилась ли игра
+        {
+            //если игра окончилась и компьютер победил
+            if ((PgameLogic.GameOver && !EgameLogic.GameOver) && (EgameLogic.FoodCount > PgameLogic.FoodCount))
+            {
+                MessageBox.Show("Компьютер победил"); //вывод сообщения "Компьютер победил"
+                EnemyWinCount++; //увеличение счетчика побед у копьютера
+                return false; //возвращает значение false
+            }
+            //если игра окончилась и игрок победил
+            else if (EgameLogic.GameOver && !PgameLogic.GameOver && PgameLogic.FoodCount > EgameLogic.FoodCount)
+            {
+                MessageBox.Show("Читер?"); //вывод сообщения "Человек крут"
+                PlayerWinCount++; //увеличение счетчика побед у копьютера
+                return false; //возврат значения false
+            }
+            //если оба игрока умерли
+            else if (EgameLogic.GameOver && PgameLogic.GameOver)
+            {
+                return false; //возвращает false
+            }
+            //иначе игра продолжается
+            else
+            {
+                return true; //возвращает true
+            }
+
+        }
     }
 }
